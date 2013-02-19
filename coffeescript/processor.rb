@@ -15,7 +15,7 @@ module ClientSideValidations
     end
 
     def self.file_name
-      'rails.validations.zepto'
+      'rails.validations'
     end
 
     def self.template

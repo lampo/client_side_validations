@@ -450,7 +450,7 @@ window.ClientSideValidations.callbacks =
       fail:   (form, eventData) ->
       pass:   (form, eventData) ->
 
-window.ClientSideValidations.eventNS = if (window.jQuery) then 'ClientSideValidators' else ''
+window.ClientSideValidations.eventNS = if (window.jQuery) then '.ClientSideValidators' else ''
 
 # Main hook
 # If new forms are dynamically introduced into the DOM the .validate() method
