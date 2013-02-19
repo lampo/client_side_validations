@@ -2,7 +2,7 @@
   var $, validateElement, validateForm, validatorsFor,
     __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
-  $ = jQuery;
+  $ = window.jQuery || window.Zepto;
 
   $.fn.disableClientSideValidations = function() {
     ClientSideValidations.disable(this);
@@ -10,24 +10,24 @@
   };
 
   $.fn.enableClientSideValidations = function() {
-    this.filter(ClientSideValidations.selectors.forms).each(function() {
+    this.filter('form[data-validate]').each(function() {
       return ClientSideValidations.enablers.form(this);
     });
-    this.filter(ClientSideValidations.selectors.inputs).each(function() {
+    this.filter('input[name]:not([type="submit"]):enabled,textarea[name]:enabled,select[name]:enabled').filter(':visible').each(function() {
       return ClientSideValidations.enablers.input(this);
     });
     return this;
   };
 
   $.fn.resetClientSideValidations = function() {
-    this.filter(ClientSideValidations.selectors.forms).each(function() {
+    this.filter('form[data-validate]').each(function() {
       return ClientSideValidations.reset(this);
     });
     return this;
   };
 
   $.fn.validate = function() {
-    this.filter(ClientSideValidations.selectors.forms).each(function() {
+    this.filter('form[data-validate]').each(function() {
       return $(this).enableClientSideValidations();
     });
     return this;
@@ -50,9 +50,9 @@
 
   validateForm = function(form, validators) {
     var valid;
-    form.trigger('form:validate:before.ClientSideValidations');
+    form.trigger('form:validate:before' + ClientSideValidations.eventNS);
     valid = true;
-    form.find(ClientSideValidations.selectors.validate_inputs).each(function() {
+    form.find('input[data-validate]:enabled,textarea[data-validate]:enabled,select[data-validate]:enabled').filter(':visible').each(function() {
       if (!$(this).isValid(validators)) {
         valid = false;
       }
@@ -61,24 +61,24 @@
     if (valid) {
       form.trigger('form:validate:pass.ClientSideValidations');
     } else {
-      form.trigger('form:validate:fail.ClientSideValidations');
+      form.trigger('form:validate:fail' + ClientSideValidations.eventNS);
     }
-    form.trigger('form:validate:after.ClientSideValidations');
+    form.trigger('form:validate:after' + ClientSideValidations.eventNS);
     return valid;
   };
 
   validateElement = function(element, validators) {
     var afterValidate, destroyInputName, executeValidators, failElement, local, passElement, remote;
-    element.trigger('element:validate:before.ClientSideValidations');
+    element.trigger('element:validate:before' + ClientSideValidations.eventNS);
     passElement = function() {
-      return element.trigger('element:validate:pass.ClientSideValidations').data('valid', null);
+      return element.trigger('element:validate:pass' + ClientSideValidations.eventNS).data('valid', null);
     };
     failElement = function(message) {
-      element.trigger('element:validate:fail.ClientSideValidations', message).data('valid', false);
+      element.trigger('element:validate:fail' + ClientSideValidations.eventNS, message).data('valid', false);
       return false;
     };
     afterValidate = function() {
-      return element.trigger('element:validate:after.ClientSideValidations').data('valid') !== false;
+      return element.trigger('element:validate:after' + ClientSideValidations.eventNS).data('valid') !== false;
     };
     executeValidators = function(context) {
       var fn, kind, message, valid, validator, _i, _len, _ref;
@@ -126,12 +126,6 @@
     window.ClientSideValidations.forms = {};
   }
 
-  window.ClientSideValidations.selectors = {
-    inputs: ':input:not(button):not([type="submit"])[name]:visible:enabled',
-    validate_inputs: ':input:enabled:visible[data-validate]',
-    forms: 'form[data-validate]'
-  };
-
   window.ClientSideValidations.reset = function(form) {
     var $form, key;
     $form = $(form);
@@ -147,11 +141,11 @@
     $target = $(target);
     $target.off('.ClientSideValidations');
     if ($target.is('form')) {
-      return ClientSideValidations.disable($target.find(':input'));
+      return ClientSideValidations.disable($target.find('input,textarea,select'));
     } else {
       $target.removeData('valid');
       $target.removeData('changed');
-      return $target.filter(':input').each(function() {
+      return $target.filter('input,textarea,select').each(function() {
         return $(this).removeAttr('data-validate');
       });
     }
@@ -199,7 +193,7 @@
         binding = _ref[event];
         $form.on(event, binding);
       }
-      return $form.find(ClientSideValidations.selectors.inputs).each(function() {
+      return $form.find('input[name]:not([type="submit"]):enabled,textarea[name]:enabled,select[name]:enabled').filter(':visible').each(function() {
         return ClientSideValidations.enablers.input(this);
       });
     },
@@ -238,18 +232,18 @@
       };
       for (event in _ref) {
         binding = _ref[event];
-        $input.filter(':not(:radio):not([id$=_confirmation])').each(function() {
+        $input.filter(':not([type="radio"]):not([id$=_confirmation])').each(function() {
           return $(this).attr('data-validate', true);
         }).on(event, binding);
       }
-      $input.filter(':checkbox').on('click.ClientSideValidations', function() {
+      $input.filter('[type="checkbox"]').on('click.ClientSideValidations', function() {
         $(this).isValid(form.ClientSideValidations.settings.validators);
         return true;
       });
       return $input.filter('[id$=_confirmation]').each(function() {
         var confirmationElement, element, _ref1, _results;
         confirmationElement = $(this);
-        element = $form.find("#" + (this.id.match(/(.+)_confirmation/)[1]) + ":input");
+        element = $form.find("#" + (this.id.match(/(.+)_confirmation/)[1])).filter('input,textarea,select');
         if (element[0]) {
           _ref1 = {
             'focusout.ClientSideValidations': function() {
@@ -466,7 +460,7 @@
           if (name_prefix && name_suffix) {
             form = element.closest('form');
             valid = true;
-            form.find(':input[name^="' + name_prefix + '"][name$="' + name_suffix + '"]').each(function() {
+            form.find('[name^="' + name_prefix + '"][name$="' + name_suffix + '"]').filter('input,textarea,select').each(function() {
               if ($(this).attr('name') !== name) {
                 if ($(this).val() === value) {
                   valid = false;
@@ -515,8 +509,8 @@
             if (scoped_element[0] && scoped_element.val() !== scope_value) {
               data.scope[key] = scoped_element.val();
               scoped_element.unbind("change." + element.id).bind("change." + element.id, function() {
-                element.trigger('change.ClientSideValidations');
-                return element.trigger('focusout.ClientSideValidations');
+                element.trigger('change' + ClientSideValidations.eventNS);
+                return element.trigger('focusout' + ClientSideValidations.eventNS);
               });
             } else {
               data.scope[key] = scope_value;
@@ -627,9 +621,11 @@
     }
   };
 
+  ClientSideValidations.eventNS = window.jQuery ? 'ClientSideValidators' : '';
+
   $(function() {
     ClientSideValidations.disableValidators();
-    return $(ClientSideValidations.selectors.forms).validate();
+    return $('form[data-validate]').validate();
   });
 
 }).call(this);

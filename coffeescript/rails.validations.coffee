@@ -5,25 +5,26 @@
 # Licensed under the MIT license
 # http://www.opensource.org/licenses/mit-license.php
 
-$ = jQuery
+$ = window.jQuery || window.Zepto
+
 $.fn.disableClientSideValidations = ->
   ClientSideValidations.disable(@)
   @
 
 $.fn.enableClientSideValidations = ->
-  @filter(ClientSideValidations.selectors.forms).each ->
+  @filter('form[data-validate]').each ->
     ClientSideValidations.enablers.form(@)
-  @filter(ClientSideValidations.selectors.inputs).each ->
+  @filter('input[name]:not([type="submit"]):enabled,textarea[name]:enabled,select[name]:enabled').filter(':visible').each ->
     ClientSideValidations.enablers.input(@)
   @
 
 $.fn.resetClientSideValidations = ->
-  @filter(ClientSideValidations.selectors.forms).each ->
+  @filter('form[data-validate]').each ->
     ClientSideValidations.reset(@)
   @
 
 $.fn.validate = ->
-  @filter(ClientSideValidations.selectors.forms).each ->
+  @filter('form[data-validate]').each ->
     $(@).enableClientSideValidations()
   @
 
@@ -39,31 +40,31 @@ validatorsFor = (name, validators) ->
   validators[name] || {}
 
 validateForm = (form, validators) ->
-  form.trigger('form:validate:before.ClientSideValidations')
+  form.trigger('form:validate:before'+ClientSideValidations.eventNS)
 
   valid = true
-  form.find(ClientSideValidations.selectors.validate_inputs).each ->
+  form.find('input[data-validate]:enabled,textarea[data-validate]:enabled,select[data-validate]:enabled').filter(':visible').each ->
     valid = false unless $(@).isValid(validators)
     # we don't want the loop to break out by mistake
     true
 
-  if valid then form.trigger('form:validate:pass.ClientSideValidations') else form.trigger('form:validate:fail.ClientSideValidations')
+  if valid then form.trigger('form:validate:pass.ClientSideValidations') else form.trigger('form:validate:fail'+ClientSideValidations.eventNS)
 
-  form.trigger('form:validate:after.ClientSideValidations')
+  form.trigger('form:validate:after'+ClientSideValidations.eventNS)
   valid
 
 validateElement = (element, validators) ->
-  element.trigger('element:validate:before.ClientSideValidations')
+  element.trigger('element:validate:before'+ClientSideValidations.eventNS)
 
   passElement = ->
-    element.trigger('element:validate:pass.ClientSideValidations').data('valid', null)
+    element.trigger('element:validate:pass'+ClientSideValidations.eventNS).data('valid', null)
 
   failElement = (message) ->
-    element.trigger('element:validate:fail.ClientSideValidations', message).data('valid', false)
+    element.trigger('element:validate:fail'+ClientSideValidations.eventNS, message).data('valid', false)
     false
 
   afterValidate = ->
-    element.trigger('element:validate:after.ClientSideValidations').data('valid') != false
+    element.trigger('element:validate:after'+ClientSideValidations.eventNS).data('valid') != false
 
   executeValidators = (context) ->
     valid = true
@@ -105,11 +106,6 @@ if window.ClientSideValidations == undefined
 if window.ClientSideValidations.forms == undefined
   window.ClientSideValidations.forms = {}
 
-window.ClientSideValidations.selectors =
-  inputs: ':input:not(button):not([type="submit"])[name]:visible:enabled'
-  validate_inputs: ':input:enabled:visible[data-validate]'
-  forms:  'form[data-validate]'
-
 window.ClientSideValidations.reset = (form) ->
   $form = $(form)
   ClientSideValidations.disable(form)
@@ -122,11 +118,11 @@ window.ClientSideValidations.disable = (target) ->
   $target = $(target)
   $target.off('.ClientSideValidations')
   if $target.is('form')
-    ClientSideValidations.disable($target.find(':input'))
+    ClientSideValidations.disable($target.find('input,textarea,select'))
   else
     $target.removeData('valid')
     $target.removeData('changed')
-    $target.filter(':input').each ->
+    $target.filter('input,textarea,select').each ->
       $(@).removeAttr('data-validate')
 
 window.ClientSideValidations.enablers =
@@ -152,7 +148,7 @@ window.ClientSideValidations.enablers =
       'form:validate:pass.ClientSideValidations'  : (eventData) -> ClientSideValidations.callbacks.form.pass(  $form, eventData)
     }
 
-    $form.find(ClientSideValidations.selectors.inputs).each ->
+    $form.find('input[name]:not([type="submit"]):enabled,textarea[name]:enabled,select[name]:enabled').filter(':visible').each ->
       ClientSideValidations.enablers.input(@)
 
   input: (input) ->
@@ -160,7 +156,7 @@ window.ClientSideValidations.enablers =
     form   = input.form
     $form  = $(form)
 
-    $input.filter(':not(:radio):not([id$=_confirmation])')
+    $input.filter(':not([type="radio"]):not([id$=_confirmation])')
       .each ->
         $(@).attr('data-validate', true)
       .on(event, binding) for event, binding of {
@@ -182,7 +178,7 @@ window.ClientSideValidations.enablers =
           , eventData)
       }
 
-    $input.filter(':checkbox').on('click.ClientSideValidations', ->
+    $input.filter('[type="checkbox"]').on('click.ClientSideValidations', ->
        $(@).isValid(form.ClientSideValidations.settings.validators)
        # If we don't return true here the checkbox will immediately uncheck itself.
        return true
@@ -191,7 +187,7 @@ window.ClientSideValidations.enablers =
     # Inputs for confirmations
     $input.filter('[id$=_confirmation]').each ->
       confirmationElement = $(@)
-      element = $form.find("##{@id.match(/(.+)_confirmation/)[1]}:input")
+      element = $form.find("##{@id.match(/(.+)_confirmation/)[1]}").filter('input,textarea,select')
       if element[0]
         $("##{confirmationElement.attr('id')}").on(event, binding) for event, binding of {
           'focusout.ClientSideValidations': -> element.data('changed', true).isValid(form.ClientSideValidations.settings.validators)
@@ -328,7 +324,7 @@ window.ClientSideValidations.validators =
             form = element.closest('form')
             valid = true
 
-            form.find(':input[name^="' + name_prefix + '"][name$="' + name_suffix + '"]').each ->
+            form.find('[name^="' + name_prefix + '"][name$="' + name_suffix + '"]').filter('input,textarea,select').each ->
               if $(@).attr('name') != name
                 if $(@).val() == value
                   valid = false
@@ -369,8 +365,8 @@ window.ClientSideValidations.validators =
             if scoped_element[0] and scoped_element.val() != scope_value
               data.scope[key] = scoped_element.val()
               scoped_element.unbind("change.#{element.id}").bind "change.#{element.id}", ->
-                element.trigger('change.ClientSideValidations')
-                element.trigger('focusout.ClientSideValidations')
+                element.trigger('change'+ClientSideValidations.eventNS)
+                element.trigger('focusout'+ClientSideValidations.eventNS)
             else
               data.scope[key] = scope_value
 
@@ -454,10 +450,12 @@ window.ClientSideValidations.callbacks =
       fail:   (form, eventData) ->
       pass:   (form, eventData) ->
 
+ClientSideValidations.eventNS = if (window.jQuery) then 'ClientSideValidators' else ''
+
 # Main hook
 # If new forms are dynamically introduced into the DOM the .validate() method
 # must be invoked on that form
 $(->
   ClientSideValidations.disableValidators()
-  $(ClientSideValidations.selectors.forms).validate()
+  $('form[data-validate]').validate()
 )
